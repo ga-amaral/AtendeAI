@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   LayoutDashboard,
@@ -55,7 +56,8 @@ function NavigationLinks({ pathname, onNavigate }: { pathname: string; onNavigat
   );
 }
 
-export function Sidebar({ pathname }: { pathname: string }) {
+export function Sidebar() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
