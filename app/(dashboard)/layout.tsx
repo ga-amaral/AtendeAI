@@ -29,7 +29,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl gap-4 px-3 py-3 sm:px-4 sm:py-4">
+    <div className="mx-auto flex min-h-screen max-w-[1720px] gap-4 px-3 py-3 sm:px-4 sm:py-4 lg:px-6 xl:px-8 2xl:px-10">
       <Sidebar />
 
       <main className="min-w-0 flex-1 space-y-6 py-1 md:space-y-7 md:py-2">
