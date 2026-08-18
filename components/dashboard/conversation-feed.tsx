@@ -84,7 +84,7 @@ function ConversationFeed({
 
   return (
     <GlassCard className={cn("flex h-full flex-col p-5", className)}>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">Conversas ao vivo</h2>
           <GlassBadge tone="green" className="gap-1.5">
@@ -116,7 +116,7 @@ function ConversationFeed({
                 index === 0 && "border-violet-400/20 bg-violet-500/[0.06]"
               )}
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-white">
                   {c.customer_phone}
                 </p>

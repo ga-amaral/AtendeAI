@@ -158,7 +158,7 @@ export default async function DashboardPage() {
           aria-hidden
         />
         <div className="relative flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="max-w-xl space-y-5">
+          <div className="min-w-0 max-w-xl space-y-5">
             <div className="flex flex-wrap items-center gap-2">
               <GlassBadge tone="violet" className="gap-1.5">
                 <Sparkles className="size-3.5" />
@@ -289,7 +289,7 @@ export default async function DashboardPage() {
                   <li
                     key={a.id}
                     className={cn(
-                      "relative rounded-xl px-3 py-2 pl-7",
+                      "relative rounded-xl px-2 py-2 pl-7 sm:px-3",
                       isNext &&
                         "border border-violet-400/20 bg-violet-500/[0.06]"
                     )}
@@ -303,7 +303,7 @@ export default async function DashboardPage() {
                       />
                     </span>
                     <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-white">
                           {a.customer_name}
                         </p>
@@ -319,7 +319,12 @@ export default async function DashboardPage() {
                           {STATUS_LABEL[a.status]}
                         </GlassBadge>
                         {isNext && (
-                          <GlassBadge tone="violet">Próximo</GlassBadge>
+                          <GlassBadge
+                            tone="violet"
+                            className="hidden sm:inline-flex"
+                          >
+                            Próximo
+                          </GlassBadge>
                         )}
                       </div>
                     </div>

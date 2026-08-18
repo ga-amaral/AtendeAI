@@ -56,7 +56,7 @@ export default async function SetupPage() {
           <ClientSettingsForm client={client} />
         </GlassCard>
 
-        <GlassCard className="p-6">
+        <GlassCard className="p-5 sm:p-6">
           <h2 className="mb-4 font-semibold">Serviços</h2>
           <ServiceForm clientId={client.id} />
           <div className="mt-4">

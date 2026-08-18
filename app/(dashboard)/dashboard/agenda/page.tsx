@@ -79,7 +79,7 @@ export default async function AgendaPage() {
       />
 
       <GlassCard className="p-5 sm:p-6">
-        <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="eyebrow mb-1">Proximos horarios</p>
             <h2 className="font-semibold tracking-tight">Agendamentos futuros</h2>
@@ -96,7 +96,7 @@ export default async function AgendaPage() {
             {upcoming.map((a) => (
               <li
                 key={a.id}
-                className="surface-inset flex flex-wrap items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-white/[0.045]"
+                className="surface-inset flex flex-col items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/[0.045] sm:flex-row sm:items-center sm:gap-4"
               >
                 <div>
                   <p className="font-medium tracking-tight">{a.customer_name}</p>
@@ -104,7 +104,7 @@ export default async function AgendaPage() {
                     {formatAppointment(a)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                   <GlassBadge
                     tone={a.status === "confirmed" ? "green" : "violet"}
                   >
@@ -125,7 +125,7 @@ export default async function AgendaPage() {
             {past.map((a) => (
               <li
                 key={a.id}
-                className="surface-inset flex flex-wrap items-center justify-between gap-4 px-4 py-3"
+                className="surface-inset flex flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
               >
                 <div>
                   <p className="font-medium">{a.customer_name}</p>

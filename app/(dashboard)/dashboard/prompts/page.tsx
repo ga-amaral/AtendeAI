@@ -70,7 +70,7 @@ export default async function PromptsPage() {
           ) : (
             items.map((p) => (
               <GlassCard key={p.id} hover className="p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">

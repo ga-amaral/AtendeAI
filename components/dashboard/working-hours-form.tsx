@@ -55,7 +55,7 @@ export function WorkingHoursForm({ clientId }: { clientId: string }) {
           id="wh-day"
           value={day}
           onChange={(e) => setDay(e.target.value)}
-          className="flex h-9 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+          className="flex min-h-11 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
         >
           {DAYS.map((d, i) => (
             <option key={i} value={i} className="bg-background text-foreground">
@@ -120,7 +120,7 @@ export function WorkingHoursList({ hours }: { hours: WorkingHours[] }) {
       {sorted.map((h) => (
         <li
           key={h.id}
-          className="surface-inset flex items-center justify-between gap-3 px-4 py-2.5"
+          className="surface-inset flex flex-col items-start justify-between gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-3"
         >
           <div>
             <p className="font-medium">

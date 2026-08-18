@@ -15,7 +15,7 @@ const PrimaryButton = React.forwardRef<HTMLButtonElement, PrimaryButtonProps>(
       <Comp
         ref={ref}
         className={cn(
-          "inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold",
+          "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold",
           "bg-gradient-to-r from-violet-600 to-blue-500 text-white",
           "shadow-[0_4px_20px_rgba(124,58,237,0.35)]",
           "transition-all duration-300 hover:-translate-y-px hover:shadow-[0_6px_28px_rgba(124,58,237,0.55)] hover:brightness-110 active:translate-y-0",

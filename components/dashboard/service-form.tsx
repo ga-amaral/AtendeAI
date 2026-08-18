@@ -118,7 +118,7 @@ export function ServiceList({ services }: { services: Service[] }) {
       {services.map((s) => (
         <li
           key={s.id}
-          className="surface-inset flex items-center justify-between gap-3 px-4 py-2.5"
+          className="surface-inset flex flex-col items-start justify-between gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-3"
         >
           <div>
             <p className="font-medium">{s.name}</p>
