@@ -74,20 +74,33 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      try {
-        // Cria o tenant inicial do usuário (best-effort; RLS garante user_id).
-        await supabase.from("clients").insert({
-          user_id: data.user.id,
-          business_name: businessName || "Meu negócio",
-          active: true,
-        });
-      } catch {
-        // Não bloqueia o fluxo; o setup pode concluir depois.
+      if (data.session) {
+        try {
+          const res = await fetch("/api/clients", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              business_name: businessName || "Meu negócio",
+              business_phone: null,
+              segment: null,
+            }),
+          });
+          const json = await res.json().catch(() => null);
+          if (!res.ok) {
+            setError(
+              `Não foi possível criar seu negócio automaticamente (${json?.error ?? "erro desconhecido"}). Você poderá criá-lo na tela de Setup após entrar.`
+            );
+          }
+        } catch {
+          setError(
+            "Não foi possível criar seu negócio automaticamente. Você poderá criá-lo na tela de Setup após entrar."
+          );
+        }
       }
-    }
 
-    router.push("/dashboard");
-    router.refresh();
+      router.push("/dashboard");
+      router.refresh();
+    }
   }
 
   return (

@@ -1,6 +1,7 @@
 import { getDashboardContext } from "@/lib/dashboard";
 import { PageHeader } from "@/components/ui/page-header";
 import { GlassCard } from "@/components/ui/glass-card";
+import { CreateTenantForm } from "@/components/dashboard/create-tenant-form";
 import { ClientSettingsForm } from "@/components/dashboard/client-settings-form";
 import { ServiceForm, ServiceList } from "@/components/dashboard/service-form";
 import {
@@ -16,12 +17,17 @@ export default async function SetupPage() {
   if (!client) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Setup" />
+        <PageHeader
+          title="Setup"
+          description="Você ainda não possui um negócio cadastrado. Crie seu negócio abaixo para começar."
+        />
         <GlassCard className="p-5 sm:p-6">
-          <p className="text-sm text-muted-foreground">
-            Você ainda não possui um negócio cadastrado. Finalize o cadastro de
-            conta e crie seu tenant para continuar.
+          <h2 className="mb-1 font-semibold">Criar meu negócio</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Preencha os dados básicos para criar seu tenant. Depois você
+            configura serviços, horários e a integração do WhatsApp.
           </p>
+          <CreateTenantForm />
         </GlassCard>
       </div>
     );
