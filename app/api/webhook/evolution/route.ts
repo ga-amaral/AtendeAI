@@ -14,6 +14,7 @@ import {
   checkAvailability,
   createAppointment,
 } from "@/lib/domain/scheduling";
+import { getClientByInstance } from "@/lib/domain/tenants";
 import type { Client } from "@/types";
 
 export const runtime = "nodejs";
@@ -77,7 +78,7 @@ async function loadPrompt(clientId: string) {
     .from("attendance_prompts")
     .select("*")
     .eq("client_id", clientId)
-    .eq("is_active", true)
+    .eq("active", true)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -88,14 +89,14 @@ async function loadPrompt(clientId: string) {
 
 async function getOrCreateConversation(
   clientId: string,
-  contactPhone: string,
-  contactName: string | null
+  customerPhone: string,
+  instanceName: string
 ) {
   const { data: existing, error: findError } = await supabaseAdmin
     .from("conversations")
     .select("*")
     .eq("client_id", clientId)
-    .eq("contact_phone", contactPhone)
+    .eq("customer_phone", customerPhone)
     .maybeSingle();
 
   if (findError) throw findError;
@@ -105,9 +106,8 @@ async function getOrCreateConversation(
     .from("conversations")
     .insert({
       client_id: clientId,
-      contact_phone: contactPhone,
-      contact_name: contactName,
-      status: "open",
+      customer_phone: customerPhone,
+      evolution_instance_name: instanceName,
       last_message_at: new Date().toISOString(),
       messages: [],
     })
@@ -118,11 +118,7 @@ async function getOrCreateConversation(
   return data;
 }
 
-async function persistMessage(
-  conversationId: string,
-  message: unknown,
-  status: string
-) {
+async function persistMessage(conversationId: string, message: unknown) {
   const { data: current, error: fetchError } = await supabaseAdmin
     .from("conversations")
     .select("messages")
@@ -137,10 +133,33 @@ async function persistMessage(
     .update({
       messages: [...messages, message],
       last_message_at: new Date().toISOString(),
-      status,
     })
     .eq("id", conversationId);
   if (error) throw error;
+}
+
+function buildSystemPrompt(prompt: {
+  system_prompt?: string | null;
+  business_rules?: unknown;
+  services?: unknown;
+  working_hours?: unknown;
+  greeting_message?: string | null;
+}): string {
+  const parts: string[] = [];
+  parts.push(
+    prompt.system_prompt?.trim() ??
+      "Você é o assistente de agendamento deste negócio. Ajude o cliente a verificar horários e criar ou cancelar agendamentos. Seja breve e cordial."
+  );
+  if (prompt.business_rules) {
+    parts.push(`Regras do negócio: ${JSON.stringify(prompt.business_rules)}`);
+  }
+  if (prompt.services) {
+    parts.push(`Serviços: ${JSON.stringify(prompt.services)}`);
+  }
+  if (prompt.working_hours) {
+    parts.push(`Horários de funcionamento: ${JSON.stringify(prompt.working_hours)}`);
+  }
+  return parts.join("\n\n");
 }
 
 async function executeToolCall(
@@ -153,8 +172,7 @@ async function executeToolCall(
       const slots = await checkAvailability(
         client.id,
         String(args.service_name ?? ""),
-        String(args.date ?? ""),
-        client.timezone
+        String(args.date ?? "")
       );
       if (slots.length === 0) {
         return JSON.stringify({
@@ -164,28 +182,25 @@ async function executeToolCall(
       }
       return JSON.stringify({
         available: true,
-        slots: slots.map((s) => ({
-          start_time: s.start_time,
-          end_time: s.end_time,
-          start: s.start,
-        })),
+        slots,
       });
     }
     case "create_appointment": {
       const appointment = await createAppointment({
         clientId: client.id,
         serviceName: String(args.service_name ?? ""),
-        startsAt: String(args.starts_at ?? ""),
+        date: String(args.date ?? ""),
+        time: String(args.time ?? ""),
         customerName: String(args.customer_name ?? ""),
         customerPhone: String(args.customer_phone ?? ""),
-        timezone: client.timezone,
       });
       return JSON.stringify({
         created: true,
         appointment: {
           id: appointment.id,
-          starts_at: appointment.starts_at,
-          ends_at: appointment.ends_at,
+          date: appointment.date,
+          time: appointment.time,
+          status: appointment.status,
         },
       });
     }
@@ -193,9 +208,9 @@ async function executeToolCall(
       const appointment = await cancelAppointment({
         clientId: client.id,
         serviceName: String(args.service_name ?? ""),
-        startsAt: String(args.starts_at ?? ""),
+        date: String(args.date ?? ""),
+        time: String(args.time ?? ""),
         customerPhone: String(args.customer_phone ?? ""),
-        timezone: client.timezone,
       });
       return JSON.stringify({
         cancelled: true,
@@ -224,8 +239,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing instance" }, { status: 400 });
   }
 
-  const { remoteJid, messageId, isFromMe, text, pushName } =
-    extractMessage(payload);
+  const { remoteJid, messageId, isFromMe, text } = extractMessage(payload);
 
   // Apenas mensagens de texto recebidas de clientes disparam a IA.
   if (!remoteJid || isFromMe || !text.trim() || !messageId) {
@@ -234,54 +248,43 @@ export async function POST(request: NextRequest) {
 
   let client: Client | null = null;
   try {
-    const { data, error } = await supabaseAdmin
-      .from("clients")
-      .select("*")
-      .eq("evolution_instance", instance)
-      .maybeSingle();
-    if (error) throw error;
-    client = data;
+    client = await getClientByInstance(instance);
   } catch (error) {
     console.error("[webhook] falha ao resolver client:", error);
     return NextResponse.json({ ok: true, error: "client_resolve_failed" });
   }
 
-  if (!client) {
-    console.warn(`[webhook] instância ${instance} sem client mapeado.`);
+  if (!client || !client.active) {
+    console.warn(`[webhook] instância ${instance} sem client ativo mapeado.`);
     return NextResponse.json({ ok: true, skipped: "no_client" });
   }
 
   try {
-    const contactPhone = remoteJidToNumber(remoteJid);
+    const customerPhone = remoteJidToNumber(remoteJid);
     const conversation = await getOrCreateConversation(
       client.id,
-      contactPhone,
-      pushName
+      customerPhone,
+      instance
     );
 
     const history = Array.isArray(conversation.messages) ? conversation.messages : [];
     const isDuplicate = history.some(
-      (m: { message_id?: string }) => (m as { message_id?: string }).message_id === messageId
+      (m: unknown) =>
+        (m as { message_id?: string }).message_id === messageId
     );
     if (isDuplicate) {
       return NextResponse.json({ ok: true, skipped: "duplicate" });
     }
 
-    await persistMessage(
-      conversation.id,
-      {
-        role: "user",
-        content: text,
-        message_id: messageId,
-        created_at: new Date().toISOString(),
-      },
-      "open"
-    );
+    await persistMessage(conversation.id, {
+      role: "user",
+      content: text,
+      message_id: messageId,
+      created_at: new Date().toISOString(),
+    });
 
     const prompt = await loadPrompt(client.id);
-    const systemPrompt =
-      prompt?.content ??
-      "Você é o assistente de agendamento deste negócio. Ajude o cliente a verificar horários e criar ou cancelar agendamentos. Seja breve e cordial.";
+    const systemPrompt = buildSystemPrompt(prompt ?? {});
 
     const openaiMessages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
@@ -294,9 +297,15 @@ export async function POST(request: NextRequest) {
     ];
 
     let reply = "";
+    const chatParams = {
+      apiKey: client.openai_api_key ?? undefined,
+      model: client.openai_model ?? undefined,
+    };
+
     let assistantOutput = await createChatCompletion({
       messages: openaiMessages,
       tools: EVOLUTION_TOOLS,
+      ...chatParams,
     });
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -311,7 +320,6 @@ export async function POST(request: NextRequest) {
       openaiMessages.push({
         role: "assistant",
         content: message.content,
-        // next/OpenAI tipos não exigem tool_calls aqui; o nome é passado via tool role
       });
 
       for (const toolCall of toolCalls) {
@@ -323,7 +331,9 @@ export async function POST(request: NextRequest) {
           toolResult = await executeToolCall(fn.name, args, client);
         } catch (error) {
           const message =
-            error instanceof DomainError ? error.message : "Erro interno ao executar a ação.";
+            error instanceof DomainError
+              ? error.message
+              : "Erro interno ao executar a ação.";
           console.error("[webhook] tool call falhou:", error);
           toolResult = JSON.stringify({ error: message });
         }
@@ -338,25 +348,28 @@ export async function POST(request: NextRequest) {
       assistantOutput = await createChatCompletion({
         messages: openaiMessages,
         tools: EVOLUTION_TOOLS,
+        ...chatParams,
       });
     }
 
     if (!reply) {
       reply =
+        prompt?.fallback_message ??
         "Desculpe, não consegui processar sua solicitação agora. Um atendente humano será acionado.";
     }
 
-    await sendTextMessage(instance, remoteJid, reply);
-
-    await persistMessage(
-      conversation.id,
-      {
-        role: "assistant",
-        content: reply,
-        created_at: new Date().toISOString(),
-      },
-      "open"
+    await sendTextMessage(
+      instance,
+      remoteJid,
+      reply,
+      client.evolution_api_key ?? undefined
     );
+
+    await persistMessage(conversation.id, {
+      role: "assistant",
+      content: reply,
+      created_at: new Date().toISOString(),
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

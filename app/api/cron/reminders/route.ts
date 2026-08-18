@@ -2,15 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendTextMessage } from "@/lib/evolution";
+import { DEFAULT_TIMEZONE } from "@/lib/domain/tenants";
+import type { Appointment, Client } from "@/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const REMINDER_MARK = "reminder_sent_at";
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   const header = request.headers.get("authorization");
   return header === `Bearer ${secret}`;
+}
+
+function parseReminder(notes: string | null): string | null {
+  if (!notes) return null;
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>;
+    return typeof parsed[REMINDER_MARK] === "string"
+      ? (parsed[REMINDER_MARK] as string)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -20,56 +36,90 @@ export async function POST(request: NextRequest) {
 
   const windowHours = Number(process.env.REMINDER_WINDOW_HOURS ?? 24);
   const now = new Date();
-  const windowEnd = new Date(now.getTime() + windowHours * 60 * 60 * 1000);
+
+  // Busca um dia a mais para compensar diferenças de fuso; o filtro
+  // preciso (por datetime combinado) é feito em memória.
+  const todayLocal = now.toLocaleDateString("en-CA", { timeZone: DEFAULT_TIMEZONE });
+  const upperBound = new Date(now.getTime() + (windowHours + 48) * 60 * 60 * 1000)
+    .toLocaleDateString("en-CA", { timeZone: DEFAULT_TIMEZONE });
 
   try {
-    const { data: appointments, error } = await supabaseAdmin
+    const { data: rows, error } = await supabaseAdmin
       .from("appointments")
-      .select("*")
+      .select("*, clients!inner(id, business_name, evolution_instance_name, evolution_api_key)")
       .in("status", ["scheduled", "confirmed"])
-      .is("reminder_sent_at", null)
-      .gte("starts_at", now.toISOString())
-      .lt("starts_at", windowEnd.toISOString());
+      .gte("date", todayLocal)
+      .lte("date", upperBound)
+      .order("date", { ascending: true })
+      .limit(500);
 
     if (error) throw error;
+
+    const windowEnd = new Date(now.getTime() + windowHours * 60 * 60 * 1000);
 
     let sent = 0;
     const failures: string[] = [];
 
-    for (const appointment of appointments ?? []) {
-      const { data: client, error: clientError } = await supabaseAdmin
-        .from("clients")
-        .select("name, evolution_instance, timezone")
-        .eq("id", appointment.client_id)
-        .maybeSingle();
-
-      if (clientError || !client?.evolution_instance) {
-        failures.push(appointment.id);
+    for (const row of (rows ?? []) as (Appointment & {
+      clients: Pick<Client, "business_name" | "evolution_instance_name" | "evolution_api_key">;
+    })[]) {
+      const client = row.clients;
+      if (!client?.evolution_instance_name) {
+        failures.push(row.id);
         continue;
       }
 
-      const startsAt = new Date(appointment.starts_at).toLocaleString("pt-BR", {
-        timeZone: client.timezone,
+      const startsAt = new Date(`${row.date}T${row.time}:00`);
+      if (Number.isNaN(startsAt.getTime())) {
+        failures.push(row.id);
+        continue;
+      }
+
+      // Envia apenas agendamentos dentro da janela e ainda não lembrados.
+      if (startsAt <= now || startsAt > windowEnd) continue;
+      if (parseReminder(row.notes)) continue;
+
+      const formatted = startsAt.toLocaleString("pt-BR", {
+        timeZone: DEFAULT_TIMEZONE,
         dateStyle: "short",
         timeStyle: "short",
       });
 
-      const text = `Olá, ${appointment.customer_name}! Lembrete: seu agendamento com ${client.name} está marcado para ${startsAt}. Até já!`;
+      const text = `Olá, ${row.customer_name}! Lembrete: seu agendamento com ${client.business_name} está marcado para ${formatted}. Até já!`;
 
       try {
-        await sendTextMessage(client.evolution_instance, appointment.customer_phone, text);
+        await sendTextMessage(
+          client.evolution_instance_name,
+          row.customer_phone,
+          text,
+          client.evolution_api_key ?? undefined
+        );
+
+        const baseNotes = parseReminder(row.notes)
+          ? {}
+          : (() => {
+              try {
+                return row.notes ? (JSON.parse(row.notes) as Record<string, unknown>) : {};
+              } catch {
+                return {};
+              }
+            })();
+
         const { error: updateError } = await supabaseAdmin
           .from("appointments")
-          .update({ reminder_sent_at: new Date().toISOString() })
-          .eq("id", appointment.id);
+          .update({
+            notes: JSON.stringify({ ...baseNotes, [REMINDER_MARK]: now.toISOString() }),
+          })
+          .eq("id", row.id);
+
         if (updateError) {
-          failures.push(appointment.id);
+          failures.push(row.id);
           continue;
         }
         sent += 1;
       } catch (err) {
-        console.error("[reminders] falha ao enviar", appointment.id, err);
-        failures.push(appointment.id);
+        console.error("[reminders] falha ao enviar", row.id, err);
+        failures.push(row.id);
       }
     }
 

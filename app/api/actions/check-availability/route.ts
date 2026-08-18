@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const slots = await checkAvailability(client.id, serviceName, date, client.timezone);
+    const slots = await checkAvailability(client.id, serviceName, date);
     return NextResponse.json({
       service_name: serviceName,
       date,

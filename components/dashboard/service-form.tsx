@@ -16,6 +16,7 @@ export function ServiceForm({ clientId }: { clientId: string }) {
   const supabase = createClient();
 
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("30");
   const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,13 +28,15 @@ export function ServiceForm({ clientId }: { clientId: string }) {
     const { error } = await supabase.from("services").insert({
       client_id: clientId,
       name: name.trim(),
-      duration_minutes: parseInt(duration, 10) || 30,
+      description: description.trim() || null,
+      duration: parseInt(duration, 10) || 30,
       price: price ? parseFloat(price) : null,
-      is_active: true,
+      active: true,
     });
 
     if (!error) {
       setName("");
+      setDescription("");
       setDuration("30");
       setPrice("");
     }
@@ -42,45 +45,54 @@ export function ServiceForm({ clientId }: { clientId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-      <div className="space-y-1 sm:col-span-2">
-        <Label htmlFor="svc-name">Serviço</Label>
-        <GlassInput
-          id="svc-name"
-          placeholder="Ex.: Corte de cabelo"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <div className="space-y-1 sm:col-span-2">
+          <Label htmlFor="svc-name">Serviço</Label>
+          <GlassInput
+            id="svc-name"
+            placeholder="Ex.: Corte de cabelo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="svc-duration">Duração (min)</Label>
+          <GlassInput
+            id="svc-duration"
+            type="number"
+            min={5}
+            step={5}
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="svc-price">Preço (R$)</Label>
+          <GlassInput
+            id="svc-price"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0,00"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+        </div>
       </div>
       <div className="space-y-1">
-        <Label htmlFor="svc-duration">Duração (min)</Label>
+        <Label htmlFor="svc-desc">Descrição (opcional)</Label>
         <GlassInput
-          id="svc-duration"
-          type="number"
-          min={5}
-          step={5}
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
+          id="svc-desc"
+          placeholder="Ex.: Inclui lavagem e finalização"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="svc-price">Preço (R$)</Label>
-        <GlassInput
-          id="svc-price"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="0,00"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-        />
-      </div>
-      <div className="sm:col-span-4">
-        <PrimaryButton type="submit" disabled={loading}>
-          {loading ? <Spinner /> : "Adicionar serviço"}
-        </PrimaryButton>
-      </div>
+      <PrimaryButton type="submit" disabled={loading}>
+        {loading ? <Spinner /> : "Adicionar serviço"}
+      </PrimaryButton>
     </form>
   );
 }
@@ -92,7 +104,7 @@ export function ServiceList({ services }: { services: Service[] }) {
   async function toggle(service: Service) {
     await supabase
       .from("services")
-      .update({ is_active: !service.is_active })
+      .update({ active: !service.active })
       .eq("id", service.id);
     router.refresh();
   }
@@ -111,12 +123,13 @@ export function ServiceList({ services }: { services: Service[] }) {
           <div>
             <p className="font-medium">{s.name}</p>
             <p className="text-xs text-muted-foreground">
-              {s.duration_minutes} min
+              {s.duration} min
               {s.price != null && ` · R$ ${s.price.toFixed(2).replace(".", ",")}`}
+              {s.description ? ` · ${s.description}` : ""}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => toggle(s)}>
-            {s.is_active ? "Desativar" : "Ativar"}
+            {s.active ? "Desativar" : "Ativar"}
           </Button>
         </li>
       ))}

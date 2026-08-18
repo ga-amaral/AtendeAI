@@ -2,12 +2,12 @@ import OpenAI from "openai";
 
 export const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
-export function getOpenAI(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+export function getOpenAI(apiKey?: string): OpenAI {
+  const key = apiKey ?? process.env.OPENAI_API_KEY;
+  if (!key) {
     throw new Error("OPENAI_API_KEY não configurada no ambiente do servidor.");
   }
-  return new OpenAI({ apiKey });
+  return new OpenAI({ apiKey: key });
 }
 
 export interface ChatMessage {
@@ -32,7 +32,7 @@ export const EVOLUTION_TOOLS: ToolDefinition[] = [
     function: {
       name: "check_availability",
       description:
-        "Verifica horários disponíveis para um serviço em uma data específica. Retorna a lista de slots livres.",
+        "Verifica horários disponíveis para um serviço em uma data específica. Retorna a lista de slots livres (start_time e end_time em HH:mm).",
       parameters: {
         type: "object",
         properties: {
@@ -54,7 +54,7 @@ export const EVOLUTION_TOOLS: ToolDefinition[] = [
     function: {
       name: "create_appointment",
       description:
-        "Cria um agendamento para um cliente, validando se o horário escolhido ainda está disponível.",
+        "Cria um agendamento para um cliente, validando se a data e o horário escolhidos ainda estão disponíveis.",
       parameters: {
         type: "object",
         properties: {
@@ -62,9 +62,13 @@ export const EVOLUTION_TOOLS: ToolDefinition[] = [
             type: "string",
             description: "Nome do serviço agendado.",
           },
-          starts_at: {
+          date: {
             type: "string",
-            description: "Data e hora de início no formato ISO 8601 com fuso local do negócio (ex.: 2025-03-10T14:00:00-03:00).",
+            description: "Data do agendamento no formato YYYY-MM-DD (fuso local do negócio).",
+          },
+          time: {
+            type: "string",
+            description: "Horário de início no formato HH:mm (24h, fuso local do negócio).",
           },
           customer_name: {
             type: "string",
@@ -75,7 +79,7 @@ export const EVOLUTION_TOOLS: ToolDefinition[] = [
             description: "Número do cliente com código do país (somente dígitos).",
           },
         },
-        required: ["service_name", "starts_at", "customer_name", "customer_phone"],
+        required: ["service_name", "date", "time", "customer_name", "customer_phone"],
       },
     },
   },
@@ -84,7 +88,7 @@ export const EVOLUTION_TOOLS: ToolDefinition[] = [
     function: {
       name: "cancel_appointment",
       description:
-        "Cancela um agendamento existente do cliente, localizando pelo serviço e horário.",
+        "Cancela um agendamento existente do cliente, localizando pelo serviço, data e horário.",
       parameters: {
         type: "object",
         properties: {
@@ -92,16 +96,20 @@ export const EVOLUTION_TOOLS: ToolDefinition[] = [
             type: "string",
             description: "Nome do serviço do agendamento a cancelar.",
           },
-          starts_at: {
+          date: {
             type: "string",
-            description: "Data e hora de início do agendamento no formato ISO 8601.",
+            description: "Data do agendamento no formato YYYY-MM-DD.",
+          },
+          time: {
+            type: "string",
+            description: "Horário de início do agendamento no formato HH:mm.",
           },
           customer_phone: {
             type: "string",
             description: "Número do cliente (somente dígitos) para identificar o agendamento.",
           },
         },
-        required: ["service_name", "starts_at", "customer_phone"],
+        required: ["service_name", "date", "time", "customer_phone"],
       },
     },
   },
@@ -111,15 +119,21 @@ export interface ChatCompletionParams {
   messages: ChatMessage[];
   tools?: ToolDefinition[];
   maxTokens?: number;
+  /** Chave OpenAI específica do tenant (fallback: OPENAI_API_KEY). */
+  apiKey?: string;
+  /** Modelo específico do tenant (fallback: OPENAI_MODEL). */
+  model?: string;
 }
 
 export async function createChatCompletion({
   messages,
   tools,
   maxTokens = 800,
+  apiKey,
+  model,
 }: ChatCompletionParams) {
-  return getOpenAI().chat.completions.create({
-    model: OPENAI_MODEL,
+  return getOpenAI(apiKey).chat.completions.create({
+    model: model ?? OPENAI_MODEL,
     messages: messages as unknown as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
     tools,
     tool_choice: "auto",

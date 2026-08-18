@@ -26,8 +26,8 @@ export function WorkingHoursForm({ clientId }: { clientId: string }) {
   const supabase = createClient();
 
   const [day, setDay] = useState("1");
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("18:00");
+  const [open, setOpen] = useState("09:00");
+  const [close, setClose] = useState("18:00");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,9 +37,9 @@ export function WorkingHoursForm({ clientId }: { clientId: string }) {
     const { error } = await supabase.from("working_hours").insert({
       client_id: clientId,
       day_of_week: parseInt(day, 10),
-      start_time: start,
-      end_time: end,
-      is_available: true,
+      open_time: open,
+      close_time: close,
+      is_closed: false,
     });
 
     if (!error) setDay("1");
@@ -65,22 +65,22 @@ export function WorkingHoursForm({ clientId }: { clientId: string }) {
         </select>
       </div>
       <div className="space-y-1">
-        <Label htmlFor="wh-start">Início</Label>
+        <Label htmlFor="wh-open">Abre</Label>
         <GlassInput
-          id="wh-start"
+          id="wh-open"
           type="time"
-          value={start}
-          onChange={(e) => setStart(e.target.value)}
+          value={open}
+          onChange={(e) => setOpen(e.target.value)}
           required
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="wh-end">Fim</Label>
+        <Label htmlFor="wh-close">Fecha</Label>
         <GlassInput
-          id="wh-end"
+          id="wh-close"
           type="time"
-          value={end}
-          onChange={(e) => setEnd(e.target.value)}
+          value={close}
+          onChange={(e) => setClose(e.target.value)}
           required
         />
       </div>
@@ -100,7 +100,7 @@ export function WorkingHoursList({ hours }: { hours: WorkingHours[] }) {
   async function toggle(h: WorkingHours) {
     await supabase
       .from("working_hours")
-      .update({ is_available: !h.is_available })
+      .update({ is_closed: !h.is_closed })
       .eq("id", h.id);
     router.refresh();
   }
@@ -127,11 +127,11 @@ export function WorkingHoursList({ hours }: { hours: WorkingHours[] }) {
               {DAYS[h.day_of_week] ?? `Dia ${h.day_of_week}`}
             </p>
             <p className="text-xs text-muted-foreground">
-              {h.start_time} às {h.end_time}
+              {h.open_time} às {h.close_time}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => toggle(h)}>
-            {h.is_available ? "Indisponível" : "Disponível"}
+            {h.is_closed ? "Fechado" : "Aberto"}
           </Button>
         </li>
       ))}

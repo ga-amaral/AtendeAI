@@ -24,7 +24,7 @@ export default async function DashboardLayout({
   let clientName: string | null = null;
   try {
     const client = await getClientForUser(user.id);
-    clientName = client?.name ?? null;
+    clientName = client?.business_name ?? null;
   } catch {
     // Sem tenant ainda: o setup orienta o usuário a configurar.
   }

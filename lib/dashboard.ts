@@ -20,7 +20,7 @@ export async function getDashboardContext(): Promise<DashboardContext> {
   const { data: client } = await supabase
     .from("clients")
     .select("*")
-    .eq("owner_user_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   return { user, client: (client as Client) ?? null, supabase };

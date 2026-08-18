@@ -65,9 +65,7 @@ export default async function ConversasPage() {
               <GlassCard key={c.id} hover className="p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-medium">
-                      {c.contact_name || c.contact_phone}
-                    </p>
+                    <p className="font-medium">{c.customer_phone}</p>
                     <p className="truncate text-sm text-muted-foreground">
                       {lastMessage?.content ||
                         "Conversa sem mensagens de texto"}
@@ -79,9 +77,7 @@ export default async function ConversasPage() {
                       })}
                     </p>
                   </div>
-                  <GlassBadge tone={c.status === "open" ? "blue" : "muted"}>
-                    {c.status}
-                  </GlassBadge>
+                  <GlassBadge tone="blue">WhatsApp</GlassBadge>
                 </div>
               </GlassCard>
             );

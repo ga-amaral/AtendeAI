@@ -69,13 +69,15 @@ export default async function PromptsPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium">{p.name}</p>
-                      <GlassBadge tone={p.is_active ? "green" : "muted"}>
-                        {p.is_active ? "Ativo" : "Inativo"}
+                      <p className="font-medium">
+                        Prompt v{p.version}
+                      </p>
+                      <GlassBadge tone={p.active ? "green" : "muted"}>
+                        {p.active ? "Ativo" : "Inativo"}
                       </GlassBadge>
                     </div>
                     <p className="line-clamp-3 text-sm text-muted-foreground">
-                      {p.content}
+                      {p.system_prompt}
                     </p>
                     <p className="text-xs text-muted-foreground/70">
                       Atualizado em{" "}
@@ -85,7 +87,7 @@ export default async function PromptsPage() {
                   <PromptActivate
                     promptId={p.id}
                     clientId={client.id}
-                    active={p.is_active}
+                    active={p.active}
                   />
                 </div>
               </GlassCard>

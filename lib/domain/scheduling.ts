@@ -1,7 +1,9 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { Appointment, AvailableSlot, Service } from "@/types";
+import type { Appointment, AvailableSlot, Service, WorkingHours } from "@/types";
+
+export { DEFAULT_TIMEZONE } from "@/lib/domain/tenants";
 
 const SLOT_STEP_MINUTES = 30;
 
@@ -11,38 +13,6 @@ export class DomainError extends Error {
     super(message);
     this.code = code;
   }
-}
-
-function getTzOffsetMinutes(dateStr: string, timezone: string): number {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    timeZoneName: "shortOffset",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = dtf.formatToParts(new Date(`${dateStr}T12:00:00Z`));
-  const offset = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";
-  const match = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(offset);
-  if (!match) return 0;
-  const sign = match[1] === "-" ? -1 : 1;
-  const hours = parseInt(match[2], 10);
-  const minutes = parseInt(match[3] ?? "0", 10);
-  return sign * (hours * 60 + minutes);
-}
-
-function zonedDate(dateStr: string, timezone: string, time = "00:00:00"): Date {
-  const offset = getTzOffsetMinutes(dateStr, timezone);
-  const [h, m, s = "00"] = time.split(":");
-  const asUtc = Date.UTC(
-    parseInt(dateStr.slice(0, 4), 10),
-    parseInt(dateStr.slice(5, 7), 10) - 1,
-    parseInt(dateStr.slice(8, 10), 10),
-    parseInt(h, 10),
-    parseInt(m, 10),
-    parseInt(s, 10)
-  );
-  return new Date(asUtc - offset * 60000);
 }
 
 function minutesToTime(minutes: number): string {
@@ -56,6 +26,22 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
+function dayOfWeek(date: string): number {
+  return new Date(`${date}T12:00:00Z`).getUTCDay();
+}
+
+function isValidDate(date: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(`${date}T00:00:00Z`).getTime());
+}
+
+function isValidTime(time: string): boolean {
+  return /^\d{2}:\d{2}$/.test(time) && timeToMinutes(time) >= 0 && timeToMinutes(time) < 24 * 60;
+}
+
+function minutesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
 async function findServiceByName(
   clientId: string,
   serviceName: string
@@ -65,103 +51,107 @@ async function findServiceByName(
     .select("*")
     .eq("client_id", clientId)
     .ilike("name", serviceName.trim())
-    .eq("is_active", true)
+    .eq("active", true)
     .maybeSingle();
 
   if (error) throw error;
   return data;
 }
 
-async function getExistingAppointments(
+async function getWorkingHours(
   clientId: string,
-  dayStart: string,
-  dayEnd: string
+  date: string
+): Promise<WorkingHours[]> {
+  const { data, error } = await supabaseAdmin
+    .from("working_hours")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("day_of_week", dayOfWeek(date))
+    .eq("is_closed", false);
+
+  if (error) throw error;
+  return (data ?? []) as WorkingHours[];
+}
+
+async function getAppointmentsOnDate(
+  clientId: string,
+  date: string
 ): Promise<Appointment[]> {
   const { data, error } = await supabaseAdmin
     .from("appointments")
     .select("*")
     .eq("client_id", clientId)
-    .in("status", ["scheduled", "confirmed"])
-    .gte("starts_at", dayStart)
-    .lt("starts_at", dayEnd);
+    .eq("date", date)
+    .in("status", ["scheduled", "confirmed"]);
 
   if (error) throw error;
   return (data ?? []) as Appointment[];
 }
 
-export function overlaps(
-  aStart: Date,
-  aEnd: Date,
-  bStart: Date,
-  bEnd: Date
-): boolean {
-  return aStart < bEnd && bStart < aEnd;
+/** Janelas ocupadas (em minutos) dos agendamentos de uma data, usando services.duration. */
+async function getOccupiedWindows(
+  appointments: Appointment[]
+): Promise<{ start: number; end: number }[]> {
+  if (appointments.length === 0) return [];
+
+  const serviceIds = Array.from(
+    new Set(appointments.map((a) => a.service_id).filter(Boolean))
+  ) as string[];
+  let durations = new Map<string, number>();
+
+  if (serviceIds.length > 0) {
+    const { data, error } = await supabaseAdmin
+      .from("services")
+      .select("id, duration")
+      .in("id", serviceIds as string[]);
+    if (error) throw error;
+    durations = new Map((data ?? []).map((s) => [s.id, s.duration]));
+  }
+
+  return appointments.map((a) => {
+    const start = timeToMinutes(a.time);
+    const duration = a.service_id ? durations.get(a.service_id) : undefined;
+    const end = start + (duration ?? 30);
+    return { start, end };
+  });
 }
 
 /**
  * Retorna os slots livres para um serviço em uma data, respeitando
- * working_hours do tenant e os agendamentos já existentes.
+ * working_hours do tenant e os agendamentos já existentes (overlap via duration).
  */
 export async function checkAvailability(
   clientId: string,
   serviceName: string,
-  date: string,
-  timezone: string
+  date: string
 ): Promise<AvailableSlot[]> {
+  if (!isValidDate(date)) {
+    throw new DomainError("INVALID_DATE", "Data inválida. Use o formato YYYY-MM-DD.");
+  }
+
   const service = await findServiceByName(clientId, serviceName);
   if (!service) {
     throw new DomainError("SERVICE_NOT_FOUND", `Serviço "${serviceName}" não encontrado.`);
   }
 
-  const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
-
-  const { data: hours, error } = await supabaseAdmin
-    .from("working_hours")
-    .select("*")
-    .eq("client_id", clientId)
-    .eq("day_of_week", dayOfWeek)
-    .eq("is_available", true);
-
-  if (error) throw error;
-
-  const dayStart = zonedDate(date, timezone);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-  const existing = await getExistingAppointments(
-    clientId,
-    dayStart.toISOString(),
-    dayEnd.toISOString()
-  );
+  const hours = await getWorkingHours(clientId, date);
+  const existing = await getAppointmentsOnDate(clientId, date);
+  const occupied = await getOccupiedWindows(existing);
 
   const slots: AvailableSlot[] = [];
 
-  for (const wh of hours ?? []) {
-    const startMin = timeToMinutes(wh.start_time);
-    const endMin = timeToMinutes(wh.end_time);
-    const lastStart = endMin - service.duration_minutes;
+  for (const wh of hours) {
+    const open = timeToMinutes(wh.open_time);
+    const close = timeToMinutes(wh.close_time);
+    const lastStart = close - service.duration;
 
-    for (let t = startMin; t <= lastStart; t += SLOT_STEP_MINUTES) {
-      const slotStart = new Date(
-        dayStart.getTime() + t * 60 * 1000
-      );
-      const slotEnd = new Date(
-        slotStart.getTime() + service.duration_minutes * 60 * 1000
-      );
-
-      const conflict = existing.some((appt) =>
-        overlaps(
-          slotStart,
-          slotEnd,
-          new Date(appt.starts_at),
-          new Date(appt.ends_at)
-        )
-      );
-
+    for (let t = open; t <= lastStart; t += SLOT_STEP_MINUTES) {
+      const conflict = occupied.some((w) => minutesOverlap(t, t + service.duration, w.start, w.end));
       if (!conflict) {
         slots.push({
-          start: slotStart.toISOString(),
-          end: slotEnd.toISOString(),
+          date,
           start_time: minutesToTime(t),
-          end_time: minutesToTime(t + service.duration_minutes),
+          end_time: minutesToTime(t + service.duration),
         });
       }
     }
@@ -172,49 +162,38 @@ export async function checkAvailability(
 
 /**
  * Cria um agendamento validando conflito de horário dentro do tenant.
+ * O banco garante UNIQUE(client_id, date, time); a sobreposição por
+ * duração é verificada em memória antes da inserção.
  */
 export async function createAppointment(params: {
   clientId: string;
   serviceName: string;
-  startsAt: string;
+  date: string;
+  time: string;
   customerName: string;
   customerPhone: string;
-  timezone: string;
 }): Promise<Appointment> {
+  if (!isValidDate(params.date)) {
+    throw new DomainError("INVALID_DATE", "Data inválida. Use o formato YYYY-MM-DD.");
+  }
+  if (!isValidTime(params.time)) {
+    throw new DomainError("INVALID_TIME", "Horário inválido. Use o formato HH:mm.");
+  }
+
   const service = await findServiceByName(params.clientId, params.serviceName);
   if (!service) {
     throw new DomainError("SERVICE_NOT_FOUND", `Serviço "${params.serviceName}" não encontrado.`);
   }
 
-  const startsAt = new Date(params.startsAt);
-  if (Number.isNaN(startsAt.getTime())) {
-    throw new DomainError("INVALID_DATE", "Data de início inválida.");
-  }
+  const start = timeToMinutes(params.time);
+  const end = start + service.duration;
 
-  const endsAt = new Date(startsAt.getTime() + service.duration_minutes * 60 * 1000);
+  const existing = await getAppointmentsOnDate(params.clientId, params.date);
+  const occupied = await getOccupiedWindows(existing);
 
-  const dayStart = new Date(
-    startsAt.getFullYear(),
-    startsAt.getMonth(),
-    startsAt.getDate()
-  );
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const existing = await getExistingAppointments(
-    params.clientId,
-    dayStart.toISOString(),
-    dayEnd.toISOString()
-  );
-
-  const conflict = existing.find((appt) =>
-    overlaps(startsAt, endsAt, new Date(appt.starts_at), new Date(appt.ends_at))
-  );
-
+  const conflict = occupied.some((w) => minutesOverlap(start, end, w.start, w.end));
   if (conflict) {
-    throw new DomainError(
-      "CONFLICT",
-      "O horário solicitado não está mais disponível."
-    );
+    throw new DomainError("CONFLICT", "O horário solicitado não está mais disponível.");
   }
 
   const { data, error } = await supabaseAdmin
@@ -224,8 +203,8 @@ export async function createAppointment(params: {
       service_id: service.id,
       customer_name: params.customerName,
       customer_phone: params.customerPhone,
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
+      date: params.date,
+      time: params.time,
       status: "scheduled",
     })
     .select()
@@ -242,34 +221,28 @@ export async function createAppointment(params: {
 }
 
 /**
- * Cancela um agendamento do tenant localizado por serviço/horário/cliente.
+ * Cancela um agendamento do tenant localizado por serviço/data/horário.
  */
 export async function cancelAppointment(params: {
   clientId: string;
   serviceName: string;
-  startsAt: string;
+  date: string;
+  time: string;
   customerPhone: string;
-  timezone: string;
 }): Promise<Appointment> {
   const service = await findServiceByName(params.clientId, params.serviceName);
   if (!service) {
     throw new DomainError("SERVICE_NOT_FOUND", `Serviço "${params.serviceName}" não encontrado.`);
   }
 
-  const startsAt = new Date(params.startsAt);
-  const startIso = startsAt.toISOString();
-  const endIso = new Date(
-    startsAt.getTime() + service.duration_minutes * 60 * 1000
-  ).toISOString();
-
   const { data, error } = await supabaseAdmin
     .from("appointments")
     .update({ status: "cancelled" })
     .eq("client_id", params.clientId)
     .eq("service_id", service.id)
+    .eq("date", params.date)
+    .eq("time", params.time)
     .eq("customer_phone", params.customerPhone.replace(/\D/g, ""))
-    .gte("starts_at", startIso)
-    .lt("starts_at", endIso)
     .in("status", ["scheduled", "confirmed"])
     .select()
     .maybeSingle();

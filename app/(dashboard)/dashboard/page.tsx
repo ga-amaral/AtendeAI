@@ -2,14 +2,24 @@ import Link from "next/link";
 import { CalendarDays, MessagesSquare, Users, Clock } from "lucide-react";
 
 import { getDashboardContext } from "@/lib/dashboard";
+import { DEFAULT_TIMEZONE } from "@/lib/domain/tenants";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GlassBadge } from "@/components/ui/glass-badge";
 import { PrimaryButton } from "@/components/ui/primary-button";
+import type { Appointment } from "@/types";
 
 export const dynamic = "force-dynamic";
+
+function formatAppointment(a: Appointment): string {
+  return new Date(`${a.date}T${a.time}:00`).toLocaleString("pt-BR", {
+    timeZone: DEFAULT_TIMEZONE,
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
 
 export default async function DashboardPage() {
   const { client, supabase } = await getDashboardContext();
@@ -34,9 +44,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+  const todayLocal = new Date().toLocaleDateString("en-CA", {
+    timeZone: DEFAULT_TIMEZONE,
+  });
 
   const [todayResult, upcomingResult, conversationsResult, promptsResult] =
     await Promise.all([
@@ -44,36 +54,39 @@ export default async function DashboardPage() {
         .from("appointments")
         .select("id", { count: "exact", head: true })
         .eq("client_id", client.id)
-        .in("status", ["scheduled", "confirmed"])
-        .gte("starts_at", startOfDay.toISOString())
-        .lt("starts_at", endOfDay.toISOString()),
+        .eq("date", todayLocal)
+        .in("status", ["scheduled", "confirmed"]),
       supabase
         .from("appointments")
         .select("*")
         .eq("client_id", client.id)
         .in("status", ["scheduled", "confirmed"])
-        .gte("starts_at", now.toISOString())
-        .order("starts_at", { ascending: true })
-        .limit(5),
+        .gte("date", todayLocal)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true })
+        .limit(10),
       supabase
         .from("conversations")
         .select("id", { count: "exact", head: true })
-        .eq("client_id", client.id)
-        .eq("status", "open"),
+        .eq("client_id", client.id),
       supabase
         .from("attendance_prompts")
         .select("id")
         .eq("client_id", client.id)
-        .eq("is_active", true),
+        .eq("active", true),
     ]);
 
-  const appointments = upcomingResult.data ?? [];
+  const now = new Date();
+  const appointments = (upcomingResult.data ?? []).filter((a: Appointment) => {
+    const dt = new Date(`${a.date}T${a.time}:00`);
+    return dt >= now;
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`Visão geral de ${client.name}.`}
+        description={`Visão geral de ${client.business_name}.`}
         actions={
           <Link href="/dashboard/agenda">
             <PrimaryButton>Ver agenda</PrimaryButton>
@@ -85,17 +98,17 @@ export default async function DashboardPage() {
         <StatCard
           label="Hoje"
           value={todayResult.count ?? 0}
-          hint="agendamentos confirmados"
+          hint="agendamentos no dia"
           icon={<CalendarDays className="size-5" />}
         />
         <StatCard
           label="Próximos"
           value={appointments.length}
-          hint="nos próximos registros"
+          hint="agendamentos futuros"
           icon={<Clock className="size-5" />}
         />
         <StatCard
-          label="Conversas abertas"
+          label="Conversas"
           value={conversationsResult.count ?? 0}
           hint="no WhatsApp"
           icon={<MessagesSquare className="size-5" />}
@@ -125,10 +138,7 @@ export default async function DashboardPage() {
                 <div>
                   <p className="font-medium">{a.customer_name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(a.starts_at).toLocaleString("pt-BR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
+                    {formatAppointment(a)}
                   </p>
                 </div>
                 <GlassBadge tone="violet">{a.status}</GlassBadge>

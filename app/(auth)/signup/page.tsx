@@ -52,11 +52,11 @@ export default function SignupPage() {
 
     if (data.user) {
       try {
-        // Cria o tenant inicial do usuário (best-effort; RLS garante owner_user_id).
+        // Cria o tenant inicial do usuário (best-effort; RLS garante user_id).
         await supabase.from("clients").insert({
-          owner_user_id: data.user.id,
-          name: businessName || "Meu negócio",
-          timezone: "America/Sao_Paulo",
+          user_id: data.user.id,
+          business_name: businessName || "Meu negócio",
+          active: true,
         });
       } catch {
         // Não bloqueia o fluxo; o setup pode concluir depois.

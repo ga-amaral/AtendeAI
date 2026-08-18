@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
 
   let body: {
     service_name?: string;
-    starts_at?: string;
+    date?: string;
+    time?: string;
     customer_phone?: string;
   };
   try {
@@ -24,10 +25,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
   }
 
-  const { service_name, starts_at, customer_phone } = body;
-  if (!service_name || !starts_at || !customer_phone) {
+  const { service_name, date, time, customer_phone } = body;
+  if (!service_name || !date || !time || !customer_phone) {
     return NextResponse.json(
-      { error: "Campos obrigatórios: service_name, starts_at, customer_phone." },
+      { error: "Campos obrigatórios: service_name, date, time, customer_phone." },
       { status: 400 }
     );
   }
@@ -44,9 +45,9 @@ export async function POST(request: NextRequest) {
     const appointment = await cancelAppointment({
       clientId: client.id,
       serviceName: service_name,
-      startsAt: starts_at,
+      date,
+      time,
       customerPhone: customer_phone,
-      timezone: client.timezone,
     });
 
     return NextResponse.json({ appointment });

@@ -1,6 +1,6 @@
-function getConfig() {
+function getConfig(apiKeyOverride?: string) {
   const baseUrl = process.env.EVOLUTION_API_URL;
-  const apiKey = process.env.EVOLUTION_API_KEY;
+  const apiKey = apiKeyOverride ?? process.env.EVOLUTION_API_KEY;
   if (!baseUrl) {
     throw new Error("EVOLUTION_API_URL não configurada no ambiente do servidor.");
   }
@@ -12,9 +12,10 @@ function getConfig() {
 
 async function request(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  apiKeyOverride?: string
 ): Promise<Response> {
-  const { baseUrl, apiKey } = getConfig();
+  const { baseUrl, apiKey } = getConfig(apiKeyOverride);
   return fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
@@ -45,13 +46,18 @@ export function remoteJidToNumber(remoteJid: string): string {
 export async function sendTextMessage(
   instance: string,
   to: string,
-  text: string
+  text: string,
+  apiKey?: string
 ): Promise<unknown> {
   const number = remoteJidToNumber(to);
-  const res = await request(`/message/sendText/${instance}`, {
-    method: "POST",
-    body: JSON.stringify({ number, text }),
-  });
+  const res = await request(
+    `/message/sendText/${instance}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ number, text }),
+    },
+    apiKey
+  );
   return assertOk(res, "sendText");
 }
 

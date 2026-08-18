@@ -21,17 +21,17 @@ export function PromptActivate({
     if (active) {
       await supabase
         .from("attendance_prompts")
-        .update({ is_active: false })
+        .update({ active: false })
         .eq("id", promptId);
     } else {
       // Ativa apenas este prompt para o tenant.
       await supabase
         .from("attendance_prompts")
-        .update({ is_active: false })
+        .update({ active: false })
         .eq("client_id", clientId);
       await supabase
         .from("attendance_prompts")
-        .update({ is_active: true })
+        .update({ active: true })
         .eq("id", promptId);
     }
     router.refresh();
