@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
+import { clearSupabaseAuthCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
@@ -12,6 +13,7 @@ export function SignOutButton() {
 
   async function signOut() {
     await supabase.auth.signOut();
+    clearSupabaseAuthCookies();
     router.push("/login");
     router.refresh();
   }

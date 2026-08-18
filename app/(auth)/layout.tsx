@@ -1,12 +1,23 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { createClient } from "@/lib/supabase/server";
 import { GlassCard } from "@/components/ui/glass-card";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <div

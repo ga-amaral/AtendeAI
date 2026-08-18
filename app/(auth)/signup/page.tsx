@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { clearSupabaseAuthCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase";
 import { GlassInput } from "@/components/ui/glass-input";
 import { PrimaryButton } from "@/components/ui/primary-button";
@@ -21,6 +22,28 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) {
+        return;
+      }
+      if (user) {
+        router.replace("/dashboard");
+        return;
+      }
+      clearSupabaseAuthCookies();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
