@@ -2,26 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 240 20% 5%;
+    --foreground: 240 20% 95%;
+    --card: 240 15% 7%;
+    --card-foreground: 240 20% 95%;
+    --popover: 240 15% 7%;
+    --popover-foreground: 240 20% 95%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 12% 12%;
+    --secondary-foreground: 240 20% 95%;
+    --muted: 240 12% 12%;
+    --muted-foreground: 240 8% 60%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 15% 15%;
+    --input: 240 15% 18%;
+    --ring: 262 83% 58%;
+    --chart-1: 262 83% 58%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 190 90% 55%;
+    --radius: 0.75rem;
+    --sidebar: 240 20% 6%;
+    --sidebar-foreground: 240 20% 95%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 15% 12%;
+    --sidebar-accent-foreground: 240 20% 95%;
+    --sidebar-border: 240 15% 15%;
+    --sidebar-ring: 262 83% 58%;
   }
-}
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  .dark {
+    --background: 240 20% 5%;
+    --foreground: 240 20% 95%;
+    --card: 240 15% 7%;
+    --card-foreground: 240 20% 95%;
+    --popover: 240 15% 7%;
+    --popover-foreground: 240 20% 95%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 12% 12%;
+    --secondary-foreground: 240 20% 95%;
+    --muted: 240 12% 12%;
+    --muted-foreground: 240 8% 60%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 15% 15%;
+    --input: 240 15% 18%;
+    --ring: 262 83% 58%;
+    --chart-1: 262 83% 58%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 190 90% 55%;
+    --sidebar: 240 20% 6%;
+    --sidebar-foreground: 240 20% 95%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 15% 12%;
+    --sidebar-accent-foreground: 240 20% 95%;
+    --sidebar-border: 240 15% 15%;
+    --sidebar-ring: 262 83% 58%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .glass {
+    @apply bg-white/5 border border-white/10 backdrop-blur-xl rounded-2xl;
+  }
+
+  .glass-hover {
+    @apply glass transition-colors duration-300 hover:bg-white/10;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent;
   }
 }

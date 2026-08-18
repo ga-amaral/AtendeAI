@@ -1,0 +1,16 @@
+import { cn } from "@/lib/utils";
+
+function Spinner({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-block size-4 animate-spin rounded-full border-2 border-white/20 border-t-white",
+        className
+      )}
+      aria-label="Carregando"
+      role="status"
+    />
+  );
+}
+
+export { Spinner };

@@ -19,14 +19,23 @@
 # misc
 .DS_Store
 *.pem
+*.pdb
+Thumbs.db
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+logs/
+.eslintcache
 
 # local env files
 .env*.local
+.env
+.env.*
+!.env.local.example
+!.env.example
 
 # vercel
 .vercel
@@ -34,3 +43,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# turbo / caches
+.turbo
+.cache

@@ -1,0 +1,122 @@
+{
+  "product": {
+    "name": "AgendamentoIA",
+    "type": "multi-tenant SaaS",
+    "summary": "Plataforma de agendamento via WhatsApp com um assistente de IA que conversa com clientes, consulta disponibilidade e cria, cancela ou acompanha agendamentos.",
+    "primary_users": ["prestadores de serviço", "pequenos negócios", "equipes de atendimento"],
+    "value_proposition": "Automatizar o atendimento e o agendamento no WhatsApp sem perder visibilidade, controle de agenda ou isolamento de dados entre negócios."
+  },
+  "stack": {
+    "frontend": {
+      "framework": "Next.js 14",
+      "router": "App Router",
+      "language": "TypeScript",
+      "styling": ["Tailwind CSS", "shadcn/ui"]
+    },
+    "backend_and_data": {
+      "platform": "Supabase",
+      "services": ["Postgres", "Auth", "Row Level Security (RLS)"]
+    },
+    "integrations": {
+      "whatsapp": "Evolution API self-hosted via Docker",
+      "ai": "OpenAI GPT-4o com function calling"
+    }
+  },
+  "architecture": {
+    "tenancy": "Cada negócio é representado por um client. Toda leitura, escrita e chamada de domínio deve ser limitada por client_id.",
+    "message_flow": [
+      "A Evolution API envia eventos de mensagem para POST /api/webhook/evolution.",
+      "O servidor identifica a instância e resolve o client correspondente.",
+      "A conversa e as mensagens são persistidas no tenant correto.",
+      "O GPT-4o recebe o contexto permitido e usa function calling para consultar disponibilidade, criar ou cancelar agendamentos.",
+      "A resposta final é enviada ao WhatsApp pela Evolution API."
+    ],
+    "scheduling_flow": [
+      "O agente identifica serviço, data e horário desejados.",
+      "check-availability valida horário de trabalho, duração do serviço e conflitos do tenant.",
+      "create-appointment grava o compromisso apenas se a disponibilidade ainda for válida.",
+      "cancel-appointment atualiza o status e mantém histórico auditável.",
+      "cron/reminders seleciona compromissos futuros e dispara lembretes elegíveis."
+    ]
+  },
+  "data_entities": {
+    "_note": "Schema abaixo é o REAL, já aplicado no Supabase (projeto AgendamentoIA, anirmcbdnzwwlqtxpwng) pela migration init_agendamento_ia_schema. Qualquer código deve usar exatamente estes nomes de coluna.",
+    "clients": {
+      "purpose": "Tenant/negócio proprietário de todos os dados operacionais.",
+      "key_fields": ["id", "user_id", "business_name", "business_phone", "segment", "evolution_instance_name", "evolution_api_key", "openai_api_key", "openai_model", "active", "created_at"]
+    },
+    "attendance_prompts": {
+      "purpose": "Instruções configuráveis que definem o comportamento do assistente por tenant.",
+      "key_fields": ["id", "client_id", "system_prompt", "business_rules", "services", "working_hours", "greeting_message", "fallback_message", "active", "version", "created_at", "updated_at"]
+    },
+    "services": {
+      "purpose": "Serviços agendáveis oferecidos pelo tenant.",
+      "key_fields": ["id", "client_id", "name", "description", "duration", "price", "active", "created_at"]
+    },
+    "working_hours": {
+      "purpose": "Janela semanal de funcionamento usada no cálculo de disponibilidade.",
+      "key_fields": ["id", "client_id", "day_of_week", "open_time", "close_time", "is_closed", "created_at"]
+    },
+    "appointments": {
+      "purpose": "Compromissos de clientes finais e seu ciclo de vida.",
+      "key_fields": ["id", "client_id", "customer_name", "customer_phone", "service_id", "date", "time", "status", "notes", "created_at", "updated_at"],
+      "constraints_note": "UNIQUE(client_id, date, time) no banco. A duração do serviço (services.duration) deve ser usada em memória/aplicação para checar sobreposição de horários antes de inserir."
+    },
+    "conversations": {
+      "purpose": "Contexto e histórico de atendimento por contato do WhatsApp.",
+      "key_fields": ["id", "client_id", "customer_phone", "evolution_instance_name", "messages", "last_message_at", "created_at"]
+    }
+  },
+  "app_pages": [
+    {"path": "/signup", "purpose": "Criação de conta e tenant inicial."},
+    {"path": "/login", "purpose": "Autenticação de usuário."},
+    {"path": "/dashboard", "purpose": "Visão operacional com métricas, conversas e agenda resumida."},
+    {"path": "/dashboard/conversas", "purpose": "Feed e detalhes das conversas de WhatsApp."},
+    {"path": "/dashboard/prompts", "purpose": "Configuração dos prompts de atendimento da IA."},
+    {"path": "/dashboard/agenda", "purpose": "Agenda, disponibilidade e gerenciamento de compromissos."},
+    {"path": "/dashboard/setup", "purpose": "Configuração inicial do negócio, serviços, horários e integração Evolution API."}
+  ],
+  "api_routes": [
+    {"path": "/api/webhook/evolution", "method": "POST", "purpose": "Receber e validar eventos da Evolution API; processar mensagens por tenant."},
+    {"path": "/api/actions/check-availability", "method": "POST", "purpose": "Verificar horários disponíveis para um serviço, sempre dentro de client_id."},
+    {"path": "/api/actions/create-appointment", "method": "POST", "purpose": "Criar agendamento validado e sem conflito."},
+    {"path": "/api/actions/cancel-appointment", "method": "POST", "purpose": "Cancelar agendamento do tenant com motivo e histórico."},
+    {"path": "/api/cron/reminders", "method": "POST", "purpose": "Executar envio de lembretes programados, protegido por segredo de cron."}
+  ],
+  "security_requirements": [
+    "Aplicar RLS em todas as tabelas expostas pelo Supabase.",
+    "Isolar tenants por client_id em políticas RLS, consultas, mutations, funções de IA e webhooks.",
+    "Derivar o tenant do usuário autenticado ou do mapeamento seguro da instância Evolution API; nunca confiar em client_id enviado livremente pelo navegador.",
+    "Nunca expor SUPABASE_SERVICE_ROLE_KEY, chave da OpenAI, tokens da Evolution API ou segredos de cron no frontend.",
+    "Manter segredos apenas em variáveis de ambiente do servidor e validar assinatura/autorização de webhooks e cron.",
+    "Usar a service role somente em rotas de servidor estritamente necessárias e com escopo explícito de tenant.",
+    "Não enviar dados de um tenant para o contexto de IA de outro tenant."
+  ],
+  "visual_direction": {
+    "theme": "dark",
+    "colors": {
+      "background": "#0A0A0F",
+      "accent_violet": "#7C3AED",
+      "accent_blue": "#3B82F6"
+    },
+    "style": ["glassmorphism", "alto contraste", "profundidade suave", "microanimações intencionais"],
+    "layout": {
+      "pattern": "bento grid responsivo",
+      "elements": ["hero card", "feed de conversas", "timeline de agendamentos", "cards de métricas", "orbe animada que indica o estado da IA"]
+    },
+    "ownership_note": "Antes da implementação de telas, o FrontEnd Designer e/ou Especialista em Layouts Futuristas deve definir detalhes de direção visual, componentes e comportamento responsivo."
+  },
+  "non_functional_requirements": [
+    "Todas as interfaces autenticadas devem funcionar com o tenant do usuário atual.",
+    "Datas e horários devem respeitar o timezone configurado no client.",
+    "A criação de agendamentos deve resistir a condições de corrida e evitar dupla reserva.",
+    "Webhooks devem ser idempotentes para não duplicar mensagens ou agendamentos.",
+    "Erros da IA e de integrações externas devem ser registrados sem vazar segredos ao cliente."
+  ],
+  "out_of_scope_initial_release": [
+    "Pagamentos e faturamento recorrente.",
+    "Aplicativo móvel nativo.",
+    "Suporte a múltiplos canais além de WhatsApp.",
+    "Marketplace de integrações."
+  ]
+}
