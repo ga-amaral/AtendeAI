@@ -26,7 +26,8 @@ O 431 é rejeitado pelo **HTTP server do Node antes de qualquer código da aplic
 
 ### Camada 1 — Aumentar o limite de header do Node/Next
 
-- **`package.json`**: scripts `dev` e `start` passam `node --max-http-header-size=32768` (via wrapper `node --max-http-header-size=32768 node_modules/next/dist/bin/next ...`). Isso eleva o limite do parser HTTP de ~16KB para 32KB, garantindo que a requisição com cookies grandes **chegue** ao app em vez de ser rejeitada com 431.
+- **`package.json`**: scripts `dev` e `start` passam `node --max-http-header-size=65536` (via wrapper `node --max-http-header-size=65536 node_modules/next/dist/bin/next ...`). Isso eleva o limite do parser HTTP de ~16KB para **64KB**, garantindo que a requisição com cookies grandes **chegue** ao app em vez de ser rejeitada com 431. O valor de 64KB segue a mitigação validada pela comunidade para headers de 22KB+ (supabase/ssr #78); em teste local, um header `Cookie` de **40KB** retorna 431 com limite de 32KB e passa (com autocura) com 64KB.
+- **Trade-off**: aceitar headers maiores no parser permite que um cliente malicioso envie headers maiores (consumo de memória). 64KB continua pequeno e é aceitável para self-hosted; no pior caso, os cookies `sb-*` são limpos pelo middleware na primeira requisição que passa.
 - **Ressalva**: em `npm run dev` e `next start` (Docker/self-hosted) o limite se aplica ao processo do servidor. Em **Vercel serverless/edge**, o tamanho de headers é controlado pela plataforma e pode não respeitar `--max-http-header-size` — nesse cenário, a mitigação real é enxugar o JWT (ver recomendação abaixo).
 
 ### Camada 2 — Middleware self-healing
@@ -51,5 +52,8 @@ Enxugar o tamanho do JWT de acesso para evitar o crescimento do cookie:
 ## Status de validação
 
 - Build e lint passam após o fix.
-- **Teste de simulação (sem conta real)**: subindo o dev server com a Camada 1 e enviando um header `Cookie` com cookies `sb-<ref>-auth-token.N` simulando acúmulo/oversize (> 16KB no total, acima do limite padrão do Node), a requisição **não** retorna 431 e o middleware emite `Set-Cookie: Max-Age=0` limpando cada cookie `sb-*` (autocura). Sem a Camada 1, o mesmo header é rejeitado com 431 antes do middleware rodar — confirmando que as duas camadas são necessárias.
+- **Teste de simulação (sem conta real)**: subindo o dev server com a Camada 1 e enviando headers `Cookie` simulando acúmulo/oversize:
+  - **~24KB** (6 cookies × 4KB): com limite 32KB, retorna **200** e o middleware emite `Set-Cookie: Max-Age=0` para **6/6** cookies `sb-*` (autocura).
+  - **~40KB** (10 cookies × 4KB): com limite 32KB retorna **431** (header ainda acima do limite); com limite **64KB** passa e o middleware limpa todos os `sb-*`.
+  - **Sem a Camada 1** (limite padrão 16KB), o mesmo header ~24KB é rejeitado com 431 antes do middleware rodar — confirmando que as duas camadas são necessárias.
 - Validação end-to-end (login real em browser com medição de cookies): **pendente** — o Supabase Auth estava retornando `429` (rate limit de signup por IP) no momento da implementação. Assim que o limite liberar, criar uma conta de teste própria (`teste.kernel.<timestamp>@...`) e validar o fluxo.
