@@ -51,13 +51,17 @@ export default async function PromptsPage() {
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <GlassCard className="p-6">
-          <h2 className="mb-4 font-semibold">Criar novo prompt</h2>
+        <GlassCard className="p-5 sm:p-6">
+          <p className="eyebrow mb-1">Nova versao</p>
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Criar novo prompt</h2>
           <PromptForm clientId={client.id} />
         </GlassCard>
 
         <div className="space-y-3">
-          <h2 className="font-semibold">Prompts existentes</h2>
+          <div>
+            <p className="eyebrow mb-1">Biblioteca</p>
+            <h2 className="font-semibold tracking-tight">Prompts existentes</h2>
+          </div>
           {items.length === 0 ? (
             <EmptyState
               title="Nenhum prompt criado"
@@ -65,7 +69,7 @@ export default async function PromptsPage() {
             />
           ) : (
             items.map((p) => (
-              <GlassCard key={p.id} className="p-4">
+              <GlassCard key={p.id} hover className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
@@ -76,7 +80,7 @@ export default async function PromptsPage() {
                         {p.active ? "Ativo" : "Inativo"}
                       </GlassBadge>
                     </div>
-                    <p className="line-clamp-3 text-sm text-muted-foreground">
+                    <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
                       {p.system_prompt}
                     </p>
                     <p className="text-xs text-muted-foreground/70">

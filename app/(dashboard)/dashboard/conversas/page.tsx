@@ -62,15 +62,15 @@ export default async function ConversasPage() {
               : undefined;
 
             return (
-              <GlassCard key={c.id} hover className="p-4">
+              <GlassCard key={c.id} hover className="p-4 sm:p-5">
                 <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-medium">{c.customer_phone}</p>
-                    <p className="truncate text-sm text-muted-foreground">
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-medium tracking-tight">{c.customer_phone}</p>
+                    <p className="truncate text-sm leading-6 text-muted-foreground">
                       {lastMessage?.content ||
                         "Conversa sem mensagens de texto"}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground/70">
+                    <p className="font-mono text-[11px] text-muted-foreground/70">
                       {new Date(c.last_message_at).toLocaleString("pt-BR", {
                         dateStyle: "short",
                         timeStyle: "short",

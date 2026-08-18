@@ -10,9 +10,9 @@ const GlassInput = React.forwardRef<
   <Input
     ref={ref}
     className={cn(
-      "bg-white/5 border-white/10 backdrop-blur-xl",
+      "h-10 rounded-xl bg-white/[0.055] border-white/10 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all",
       "placeholder:text-muted-foreground/60",
-      "focus-visible:ring-brand/50",
+      "focus-visible:border-violet-400/50 focus-visible:ring-brand/50",
       className
     )}
     {...props}

@@ -20,8 +20,9 @@ const NAV_ITEMS = [
 
 export function Sidebar({ pathname }: { pathname: string }) {
   return (
-    <aside className="glass sticky top-4 hidden h-[calc(100vh-2rem)] w-60 shrink-0 flex-col justify-between p-4 md:flex">
-      <div className="space-y-6">
+    <>
+      <aside className="glass sticky top-4 hidden h-[calc(100vh-2rem)] w-60 shrink-0 flex-col justify-between p-4 md:flex">
+        <div className="space-y-6">
         <Link href="/dashboard" className="block px-2 text-lg font-bold tracking-tight">
           <span className="text-gradient">Agendamento</span>IA
         </Link>
@@ -49,11 +50,24 @@ export function Sidebar({ pathname }: { pathname: string }) {
             );
           })}
         </nav>
-      </div>
+        </div>
 
-      <div>
-        <SignOutButton />
-      </div>
-    </aside>
+        <div>
+          <SignOutButton />
+        </div>
+      </aside>
+
+      <nav aria-label="Navegação principal" className="glass fixed inset-x-3 bottom-3 z-50 flex items-center justify-around p-1.5 md:hidden">
+        {NAV_ITEMS.map((item) => {
+          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href} aria-label={item.label} className={cn("flex size-11 items-center justify-center rounded-xl transition-colors", active ? "bg-gradient-to-br from-violet-600 to-blue-500 text-white shadow-lg shadow-violet-950/60" : "text-muted-foreground hover:bg-white/5 hover:text-white")}>
+              <Icon className="size-4" />
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 }

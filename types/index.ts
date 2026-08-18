@@ -64,6 +64,7 @@ export interface Appointment {
   time: string; // HH:mm
   status: AppointmentStatus;
   notes: string | null;
+  reminder_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }

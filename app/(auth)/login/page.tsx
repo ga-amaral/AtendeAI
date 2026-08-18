@@ -41,10 +41,11 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold">Entrar</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="eyebrow">Acesso seguro</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.03em]">Entrar</h1>
+        <p className="text-sm leading-6 text-muted-foreground">
           Acesse o painel da sua operação.
         </p>
       </div>
@@ -87,7 +88,7 @@ export default function LoginPage() {
 
       <p className="text-center text-sm text-muted-foreground">
         Não tem conta?{" "}
-        <Link href="/signup" className="text-brand font-medium hover:underline">
+        <Link href="/signup" className="font-medium text-violet-300 transition-colors hover:text-violet-200 hover:underline">
           Cadastre-se
         </Link>
       </p>

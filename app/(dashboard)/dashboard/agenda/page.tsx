@@ -78,8 +78,14 @@ export default async function AgendaPage() {
         description="Compromissos criados pelo assistente de IA."
       />
 
-      <GlassCard className="p-6">
-        <h2 className="mb-4 font-semibold">Agendamentos futuros</h2>
+      <GlassCard className="p-5 sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="eyebrow mb-1">Proximos horarios</p>
+            <h2 className="font-semibold tracking-tight">Agendamentos futuros</h2>
+          </div>
+          {upcoming.length > 0 && <span className="font-mono text-xs text-muted-foreground">{upcoming.length} na fila</span>}
+        </div>
         {upcoming.length === 0 ? (
           <EmptyState
             title="Nenhum agendamento futuro"
@@ -90,10 +96,10 @@ export default async function AgendaPage() {
             {upcoming.map((a) => (
               <li
                 key={a.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/[0.03] px-4 py-3 border border-white/5"
+                className="surface-inset flex flex-wrap items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-white/[0.045]"
               >
                 <div>
-                  <p className="font-medium">{a.customer_name}</p>
+                  <p className="font-medium tracking-tight">{a.customer_name}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatAppointment(a)}
                   </p>
@@ -113,13 +119,13 @@ export default async function AgendaPage() {
       </GlassCard>
 
       {past.length > 0 && (
-        <GlassCard className="p-6">
+        <GlassCard className="p-5 sm:p-6">
           <h2 className="mb-4 font-semibold">Histórico recente</h2>
           <ul className="space-y-3">
             {past.map((a) => (
               <li
                 key={a.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/[0.03] px-4 py-3 border border-white/5"
+                className="surface-inset flex flex-wrap items-center justify-between gap-4 px-4 py-3"
               >
                 <div>
                   <p className="font-medium">{a.customer_name}</p>

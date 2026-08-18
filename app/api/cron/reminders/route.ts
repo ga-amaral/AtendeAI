@@ -8,25 +8,11 @@ import type { Appointment, Client } from "@/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const REMINDER_MARK = "reminder_sent_at";
-
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   const header = request.headers.get("authorization");
   return header === `Bearer ${secret}`;
-}
-
-function parseReminder(notes: string | null): string | null {
-  if (!notes) return null;
-  try {
-    const parsed = JSON.parse(notes) as Record<string, unknown>;
-    return typeof parsed[REMINDER_MARK] === "string"
-      ? (parsed[REMINDER_MARK] as string)
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -48,6 +34,7 @@ export async function POST(request: NextRequest) {
       .from("appointments")
       .select("*, clients!inner(id, business_name, evolution_instance_name, evolution_api_key)")
       .in("status", ["scheduled", "confirmed"])
+      .is("reminder_sent_at", null)
       .gte("date", todayLocal)
       .lte("date", upperBound)
       .order("date", { ascending: true })
@@ -75,9 +62,8 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Envia apenas agendamentos dentro da janela e ainda não lembrados.
+      // Envia apenas agendamentos dentro da janela.
       if (startsAt <= now || startsAt > windowEnd) continue;
-      if (parseReminder(row.notes)) continue;
 
       const formatted = startsAt.toLocaleString("pt-BR", {
         timeZone: DEFAULT_TIMEZONE,
@@ -95,21 +81,9 @@ export async function POST(request: NextRequest) {
           client.evolution_api_key ?? undefined
         );
 
-        const baseNotes = parseReminder(row.notes)
-          ? {}
-          : (() => {
-              try {
-                return row.notes ? (JSON.parse(row.notes) as Record<string, unknown>) : {};
-              } catch {
-                return {};
-              }
-            })();
-
         const { error: updateError } = await supabaseAdmin
           .from("appointments")
-          .update({
-            notes: JSON.stringify({ ...baseNotes, [REMINDER_MARK]: now.toISOString() }),
-          })
+          .update({ reminder_sent_at: now.toISOString() })
           .eq("id", row.id);
 
         if (updateError) {

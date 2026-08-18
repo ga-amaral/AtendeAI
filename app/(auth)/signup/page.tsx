@@ -68,10 +68,11 @@ export default function SignupPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold">Criar conta</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="eyebrow">Comece em minutos</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.03em]">Criar conta</h1>
+        <p className="text-sm leading-6 text-muted-foreground">
           Comece a automatizar seus agendamentos no WhatsApp.
         </p>
       </div>
@@ -130,7 +131,7 @@ export default function SignupPage() {
 
       <p className="text-center text-sm text-muted-foreground">
         Já tem conta?{" "}
-        <Link href="/login" className="text-brand font-medium hover:underline">
+        <Link href="/login" className="font-medium text-violet-300 transition-colors hover:text-violet-200 hover:underline">
           Entrar
         </Link>
       </p>

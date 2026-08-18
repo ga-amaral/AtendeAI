@@ -17,7 +17,7 @@ export default async function SetupPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Setup" />
-        <GlassCard className="p-6">
+        <GlassCard className="p-5 sm:p-6">
           <p className="text-sm text-muted-foreground">
             Você ainda não possui um negócio cadastrado. Finalize o cadastro de
             conta e crie seu tenant para continuar.
@@ -51,7 +51,7 @@ export default async function SetupPage() {
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <GlassCard className="p-6">
+        <GlassCard className="p-5 sm:p-6">
           <h2 className="mb-4 font-semibold">Dados do negócio</h2>
           <ClientSettingsForm client={client} />
         </GlassCard>
@@ -65,7 +65,7 @@ export default async function SetupPage() {
         </GlassCard>
       </div>
 
-      <GlassCard className="p-6">
+      <GlassCard className="p-5 sm:p-6">
         <h2 className="mb-4 font-semibold">Horários de funcionamento</h2>
         <WorkingHoursForm clientId={client.id} />
         <div className="mt-4">
