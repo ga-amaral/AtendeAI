@@ -22,6 +22,20 @@ Esse padrão é documentado pela comunidade no mesmo stack (Next.js 14 + hosted 
 
 ## Fix aplicado (defensivo)
 
+O 431 é rejeitado pelo **HTTP server do Node antes de qualquer código da aplicação rodar** (middleware, layout, etc.) — quando o header `Cookie` já está grande demais, nem a limpeza client-side chega a executar porque a página nunca carrega. Por isso o fix é em **duas camadas**:
+
+### Camada 1 — Aumentar o limite de header do Node/Next
+
+- **`package.json`**: scripts `dev` e `start` passam `node --max-http-header-size=32768` (via wrapper `node --max-http-header-size=32768 node_modules/next/dist/bin/next ...`). Isso eleva o limite do parser HTTP de ~16KB para 32KB, garantindo que a requisição com cookies grandes **chegue** ao app em vez de ser rejeitada com 431.
+- **Ressalva**: em `npm run dev` e `next start` (Docker/self-hosted) o limite se aplica ao processo do servidor. Em **Vercel serverless/edge**, o tamanho de headers é controlado pela plataforma e pode não respeitar `--max-http-header-size` — nesse cenário, a mitigação real é enxugar o JWT (ver recomendação abaixo).
+
+### Camada 2 — Middleware self-healing
+
+- **`middleware.ts`**: verifica a soma do tamanho (nome+valor) dos cookies `sb-<ref>-auth-token*` (principal, chunks `.N` e verifiers PKCE). Se exceder **4KB**, o middleware emite `Set-Cookie: <cookie>=; Path=/; Max-Age=0` para **cada** cookie `sb-*` e continua a navegação. Assim o próprio middleware se autocura, sem depender do React montar no client.
+- A limpeza acontece apenas quando o cookie está anormalmente grande; uma sessão válida de tamanho normal não é removida.
+
+### Camada 3 — Limpeza no client (reforço)
+
 - **`app/(auth)/layout.tsx`**: usuários já autenticados que acessam `/login` ou `/signup` são redirecionados para `/dashboard` (evita re-login e novas escritas de cookie desnecessárias).
 - **`lib/auth-cookies.ts`** + **`login/page.tsx` / `signup/page.tsx`**: ao montar a página (com `getUser()` confirmando que **não** há sessão válida), remove cookies `sb-<ref>-auth-token*` órfãos/duplicados (chunks `.N` e verifiers PKCE). Não limpa sessão válida — o layout e o `getUser()` client protegem isso.
 - **`components/dashboard/sign-out-button.tsx`**: após `signOut()`, faz purge total de todos os cookies `sb-<ref>-auth-token*` que o library porventura não tenha removido.
@@ -37,4 +51,5 @@ Enxugar o tamanho do JWT de acesso para evitar o crescimento do cookie:
 ## Status de validação
 
 - Build e lint passam após o fix.
+- **Teste de simulação (sem conta real)**: subindo o dev server com a Camada 1 e enviando um header `Cookie` com cookies `sb-<ref>-auth-token.N` simulando acúmulo/oversize (> 16KB no total, acima do limite padrão do Node), a requisição **não** retorna 431 e o middleware emite `Set-Cookie: Max-Age=0` limpando cada cookie `sb-*` (autocura). Sem a Camada 1, o mesmo header é rejeitado com 431 antes do middleware rodar — confirmando que as duas camadas são necessárias.
 - Validação end-to-end (login real em browser com medição de cookies): **pendente** — o Supabase Auth estava retornando `429` (rate limit de signup por IP) no momento da implementação. Assim que o limite liberar, criar uma conta de teste própria (`teste.kernel.<timestamp>@...`) e validar o fluxo.
